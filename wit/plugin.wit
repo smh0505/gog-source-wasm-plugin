@@ -1,0 +1,60 @@
+package gamelib:plugin@0.1.0;
+
+/// Capability surface exposed to every WASM plugin. Deliberately generic primitives
+/// (registry/file/process/network/scoped-storage) rather than semantic, per-integration
+/// functions - a plugin composes these itself (e.g. parsing VDF/XML) instead of us writing
+/// a bespoke Rust module per source. Storage functions are auto-namespaced by the host per
+/// plugin id, so a plugin can never read/write another plugin's data or core tables
+/// directly (see milestones.md Milestone 8's DB-access note).
+interface host {
+    record game-entry {
+        id: string,
+        title: string,
+        executable-path: string,
+        platform: string,
+        cover-art-url: option<string>,
+        install-dir: option<string>,
+    }
+
+    /// Windows registry string value read. `hive` is one of "HKLM"/"HKCU".
+    read-registry-string: func(hive: string, path: string, value: string) -> option<string>;
+
+    /// Windows registry subkey name enumeration (e.g. listing installed game IDs under a
+    /// `Games` key) - `hive` is one of "HKLM"/"HKCU". Empty list (not an error) if the key
+    /// doesn't exist, matching `read-registry-string`'s "just means absent" treatment.
+    list-registry-keys: func(hive: string, path: string) -> result<list<string>, string>;
+
+    read-file: func(path: string) -> result<string, string>;
+    list-dir: func(path: string) -> result<list<string>, string>;
+    path-exists: func(path: string) -> bool;
+
+    /// Fire-and-forget spawn (no wait/exit-code) - matches how launch() is used elsewhere
+    /// in this app; the host's own folder-based playtime tracking covers session duration.
+    spawn-process: func(path: string, args: list<string>) -> result<_, string>;
+
+    http-get: func(url: string) -> result<string, string>;
+
+    /// Scoped key-value settings, auto-prefixed with the calling plugin's id by the host.
+    settings-get: func(key: string) -> option<string>;
+    settings-set: func(key: string, value: string);
+
+    /// Scoped per-game key-value storage, auto-namespaced by the host per plugin id -
+    /// backs the `plugin_data` table rather than any core `games` column.
+    plugin-data-get: func(game-id: s64, key: string) -> option<string>;
+    plugin-data-set: func(game-id: s64, key: string, value: string);
+}
+
+/// Mirrors the existing TypeScript `SourcePlugin` interface (src/plugins/types.ts) -
+/// a WASM source plugin is a drop-in alternative implementation of the same contract.
+interface source-plugin {
+    use host.{game-entry};
+
+    scan: func() -> result<list<game-entry>, string>;
+    launch: func(entry: game-entry) -> result<_, string>;
+    get-install-status: func(entry: game-entry) -> result<bool, string>;
+}
+
+world source-plugin-world {
+    import host;
+    export source-plugin;
+}
