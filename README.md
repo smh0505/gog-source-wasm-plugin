@@ -1,8 +1,9 @@
 # gog-source-wasm-plugin
 
-A `SourcePlugin` for Game Library Client implemented as a WASM
-component (Milestone 8), ported from that project's built-in `gog.rs` +
-`src/plugins/gog/index.ts`. Enumerates installed GOG games from the registry
+A `SourcePlugin` for [Concourse](https://github.com/smh0505/Concourse) implemented as a WASM
+component, ported from that project's built-in `gog.rs` +
+`src/plugins/gog/index.ts` (both since deleted from the host app now that this plugin is the
+sole GOG implementation). Enumerates installed GOG games from the registry
 (`HKLM\SOFTWARE\WOW6432Node\GOG.com\Games\{gameID}`), same logic as the built-in version -
 just running sandboxed via `wasmtime` instead of compiled directly into the host app.
 
@@ -16,12 +17,16 @@ known value). GOG stores each installed game as its own subkey under `...\GOG.co
 unlike Steam, which only ever needed single named-value reads. Added to the shared
 `wit/plugin.wit` host interface and implemented in the host app's `wasm_plugins.rs`.
 
-`launch()` is implemented for contract-completeness but is dead code in practice - the host
-app's generic launch dispatch handles `gog://` pseudo-URIs directly off the stored
-`executable_path` (routing to `invoke("launch_gog_game", ...)`), never actually calling a
-plugin's own `launch()` export. There's no host primitive that replicates
-`GalaxyClient.exe /gameid <id> /command runGame`'s exact argument shape beyond generic
-`spawn-process`, which this uses as a best-effort mirror.
+Unlike Steam/Epic, `launch()` here is real, not dead code: GOG has no OS-registered URI scheme
+that launches a specific installed game (it does register `goggalaxy://`, confirmed via a
+real registry check, but that's not documented or used by any known reference implementation
+for launching a specific game by id - even community wrappers use the same direct CLI
+invocation this does). `launch()` resolves `GalaxyClient.exe`'s real path via the registry
+each call (`HKLM\...\GalaxyClient\paths`, 64-bit location tried first) and spawns it with
+`/gameid <id> /command runGame` - the host app's `library.ts` calls this plugin's own
+`launch()` directly for `"gog://"`-prefixed entries, the same way any other `SourcePlugin`'s
+`launch()` would be used. Verified against a real installed GOG game - `GalaxyClient.exe`
+launches for real, not just "no error returned."
 
 ## Building
 
@@ -33,11 +38,16 @@ cargo component build
 
 Output: `target/wasm32-wasip1/debug/gog_source_wasm_plugin.wasm`.
 
-## Installing into a running Game Library Client
+## Installing into a running Concourse
 
 Copy the compiled `.wasm` and `plugin.json` into
 `<app data dir>/wasm-plugins/gog-wasm/` (Windows:
-`%APPDATA%\com.minho.tauri-app\wasm-plugins\gog-wasm\`). It'll show up in Settings
-alongside the built-in GOG plugin next time the app starts, as **GOG (WASM)** -
-deliberately a different id/name (`gog-wasm`, not `gog`) so it doesn't collide with the
-built-in one while both exist side by side for comparison.
+`%APPDATA%\com.bloppy.concourse\wasm-plugins\gog-wasm\`). It'll show up in Settings' Plugins
+panel next time the app starts, as **GOG (WASM)**.
+
+## Versioning
+
+Plain SemVer (`Cargo.toml` + `plugin.json`'s `version`), independent of Concourse's own
+milestone-tracked version - patch for fixes, minor for backward-compatible new capabilities,
+major for breaking manifest/WIT interface changes. Full convention:
+`.claude/CLAUDE.md` (Plugin Versioning) in the main `concourse` repo.

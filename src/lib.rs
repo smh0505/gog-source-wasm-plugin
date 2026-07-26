@@ -5,12 +5,13 @@
 //! game IDs as registry subkeys, which the Steam port never needed - it only ever read
 //! single known-name values).
 //!
-//! `launch()` is implemented for contract-completeness but is dead code in practice, same
-//! reasoning as the Steam port: the host app's `library.ts` dispatches `"gog://"`-prefixed
-//! `executable_path` values itself via `invoke("launch_gog_game", ...)`, never through a
-//! plugin's own `launch()` export. There's no host primitive that replicates
-//! `GalaxyClient.exe /gameid <id> /command runGame`'s argument shape beyond generic
-//! `spawn-process`, so this best-effort mirrors that CLI form directly.
+//! Unlike Steam/Epic, `launch()` here is real, not dead code: GOG has no OS-registered URI
+//! scheme of its own that the host could dispatch generically via `openUrl()` (`GalaxyClient.exe`
+//! must be invoked directly with `/gameid <id> /command runGame`), so `library.ts` calls this
+//! plugin's own `launch()` export directly for `"gog://"`-prefixed entries, the same way any
+//! other `SourcePlugin` would be used. The GalaxyClient.exe path itself still has to be
+//! resolved via the registry each call - it's not something `install()`-style logic would
+//! help with, GOG Galaxy manages its own install location entirely outside this app.
 
 #[allow(warnings)]
 mod bindings;
@@ -63,9 +64,12 @@ fn to_game_entry(app: &GogApp) -> GameEntry {
     GameEntry {
         id: format!("gog-{}", app.game_id),
         title: app.name.clone(),
-        // GOG has no registered URI scheme - GalaxyClient.exe is invoked directly with CLI
-        // flags, so this pseudo-URI only exists to route the host app's generic launch
-        // dispatch (library.ts) to invoke("launch_gog_game", ...) rather than openUrl().
+        // GOG has no registered URI scheme GalaxyClient.exe launches specific games through -
+        // it does register goggalaxy:// (confirmed via a real registry check), but that's not
+        // documented to support launching a specific already-installed game by id, and no
+        // known reference implementation uses it for that; this pseudo-URI just exists so
+        // library.ts's generic dispatch routes to this plugin's own launch() below instead of
+        // openUrl(), same as how it recognizes "steam://"/Epic's real URI scheme.
         executable_path: format!("gog://{}", app.game_id),
         platform: "gog".to_string(),
         cover_art_url: None,
@@ -73,15 +77,34 @@ fn to_game_entry(app: &GogApp) -> GameEntry {
     }
 }
 
+/// Tries the 64-bit registry location first, then the 32-bit one - mirrors the built-in
+/// `gog.rs`'s (now-retired) `gog_galaxy_client_dir_from_registry`.
+fn galaxy_client_path() -> Result<String, String> {
+    for subkey in [
+        "SOFTWARE\\WOW6432Node\\GOG.com\\GalaxyClient\\paths",
+        "SOFTWARE\\GOG.com\\GalaxyClient\\paths",
+    ] {
+        if let Some(client_dir) = host::read_registry_string("HKLM", subkey, "client") {
+            return Ok(format!("{}\\GalaxyClient.exe", client_dir.trim_end_matches('\\')));
+        }
+    }
+    Err("GOG Galaxy installation not found".to_string())
+}
+
 impl Guest for GogPlugin {
     fn scan() -> Result<Vec<GameEntry>, String> {
         Ok(find_gog_apps().iter().map(to_game_entry).collect())
     }
 
+    /// GalaxyClient relays the launch to the actual game process and returns quickly, so
+    /// (like Steam/Epic URI launches) there's no child process handle worth waiting on -
+    /// playtime tracking is intentionally skipped here, same as the other launcher-owned
+    /// sources (folder-based tracking covers it instead).
     fn launch(entry: GameEntry) -> Result<(), String> {
         let game_id = entry.id.strip_prefix("gog-").unwrap_or(&entry.id);
+        let client_path = galaxy_client_path()?;
         host::spawn_process(
-            "GalaxyClient.exe",
+            &client_path,
             &[
                 "/gameid".to_string(),
                 game_id.to_string(),
