@@ -40,9 +40,15 @@ Output: `target/wasm32-wasip1/debug/gog_source_wasm_plugin.wasm`.
 
 ## Installing into a running Concourse
 
+Either build locally (above) or grab the prebuilt `.wasm` + `plugin.json` from this repo's
+Releases page once pushed - CI (`.github/workflows/publish.yml`) publishes a new release
+automatically whenever `plugin.json`'s `version` is bumped on `main`. Concourse's Settings ->
+Source tab -> Add Plugin also accepts a Release's `plugin.json` URL directly (source-kind
+plugins install by URL).
+
 Copy the compiled `.wasm` and `plugin.json` into
-`<app data dir>/wasm-plugins/gog-wasm/` (Windows:
-`%APPDATA%\com.bloppy.concourse\wasm-plugins\gog-wasm\`). It'll show up in Settings' Plugins
+`<app data dir>/wasm-plugins/source/gog-wasm/` (Windows:
+`%APPDATA%\com.bloppy.concourse\wasm-plugins\source\gog-wasm\`). It'll show up in Settings' Plugins
 panel next time the app starts, as **GOG (WASM)**.
 
 ## Versioning
