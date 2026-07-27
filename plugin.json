@@ -1,7 +1,7 @@
 {
   "id": "gog-wasm",
-  "name": "GOG (WASM)",
-  "version": "0.1.0",
+  "name": "GOG",
+  "version": "0.1.1",
   "kind": "source",
   "entry": "gog_source_wasm_plugin.wasm"
 }
