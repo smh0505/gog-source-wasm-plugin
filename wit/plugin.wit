@@ -25,14 +25,45 @@ interface host {
     list-registry-keys: func(hive: string, path: string) -> result<list<string>, string>;
 
     read-file: func(path: string) -> result<string, string>;
+    write-file: func(path: string, contents: string) -> result<_, string>;
     list-dir: func(path: string) -> result<list<string>, string>;
     path-exists: func(path: string) -> bool;
+    remove-dir: func(path: string) -> result<_, string>;
+
+    /// Milestone 13 path allowlisting - requests read access to a directory this plugin
+    /// discovered at runtime (e.g. wherever the user's Steam install actually put its library
+    /// folders), which can't be declared statically in plugin.json the way a fixed path or
+    /// registry key prefix can. The host only grants this if it recognizes the plugin id and
+    /// the path passes a real structural check for that vendor (e.g. a "steamapps"
+    /// subdirectory for Steam) - an unrecognized plugin id is rejected outright rather than
+    /// silently trusted.
+    request-read-scope: func(path: string) -> result<_, string>;
 
     /// Fire-and-forget spawn (no wait/exit-code) - matches how launch() is used elsewhere
     /// in this app; the host's own folder-based playtime tracking covers session duration.
     spawn-process: func(path: string, args: list<string>) -> result<_, string>;
 
+    /// Spawns and blocks until the process exits - unlike spawn-process, for cases that
+    /// genuinely need to wait (e.g. a visible third-party installer window the plugin needs
+    /// to know has closed before continuing).
+    run-and-wait: func(path: string, args: list<string>, cwd: string) -> result<_, string>;
+
     http-get: func(url: string) -> result<string, string>;
+    download-bytes: func(url: string) -> result<list<u8>, string>;
+
+    /// Extracts a zip archive's bytes into dest-dir, replacing anything already there.
+    extract-zip: func(bytes: list<u8>, dest-dir: string) -> result<_, string>;
+    /// If dir contains exactly one entry and it's a directory, returns that subdirectory's
+    /// path - otherwise returns dir unchanged. Real release zips commonly wrap their contents
+    /// in one top-level folder matching the archive name.
+    unwrap-single-subdir: func(dir: string) -> result<string, string>;
+    /// Atomically replaces dest with src (removing any existing dest first).
+    replace-dir: func(src: string, dest: string) -> result<_, string>;
+
+    /// This plugin's own writable directory (`<app data>/wasm-plugins/<kind>/<plugin-id>/`) - for a
+    /// plugin that manages its own downloaded dependency (e.g. a wrapper plugin's managed
+    /// install) rather than just reading/scanning existing files elsewhere.
+    plugin-dir: func() -> result<string, string>;
 
     /// Scoped key-value settings, auto-prefixed with the calling plugin's id by the host.
     settings-get: func(key: string) -> option<string>;

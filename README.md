@@ -37,6 +37,12 @@ per-plugin grant (Milestone 13) - installing via URL prompts for it in the confi
 already-installed copy (dropped in manually) shows a "Permission needed" row with a Grant
 button in Settings until granted once.
 
+Also declares four `pathScopes` (Milestone 13 path allowlisting) covering both bitness variants
+of its own fixed vendor registry keys (`...\GOG.com\Games`, `...\GalaxyClient\paths`) - GOG
+never touches the filesystem directly (confirmed via `grep`: no `read-file`/`list-dir`/
+`path-exists` calls anywhere in this repo), everything it needs comes straight out of the
+registry, so no dynamic scope request is needed the way Steam's is.
+
 ## Building
 
 ```sh

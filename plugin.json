@@ -1,8 +1,14 @@
 {
   "id": "gog-wasm",
   "name": "GOG",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "source",
   "entry": "gog_source_wasm_plugin.wasm",
-  "capabilities": ["run-programs"]
+  "capabilities": ["run-programs"],
+  "pathScopes": [
+    { "type": "registry", "hive": "HKLM", "prefix": "SOFTWARE\\WOW6432Node\\GOG.com\\Games" },
+    { "type": "registry", "hive": "HKLM", "prefix": "SOFTWARE\\GOG.com\\Games" },
+    { "type": "registry", "hive": "HKLM", "prefix": "SOFTWARE\\WOW6432Node\\GOG.com\\GalaxyClient\\paths" },
+    { "type": "registry", "hive": "HKLM", "prefix": "SOFTWARE\\GOG.com\\GalaxyClient\\paths" }
+  ]
 }
