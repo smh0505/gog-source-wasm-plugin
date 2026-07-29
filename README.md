@@ -28,6 +28,15 @@ each call (`HKLM\...\GalaxyClient\paths`, 64-bit location tried first) and spawn
 `launch()` would be used. Verified against a real installed GOG game - `GalaxyClient.exe`
 launches for real, not just "no error returned."
 
+## Permissions
+
+Declares the `run-programs` capability (`plugin.json`'s `capabilities` field) since `launch()`
+is real here (not dead code, see above) and calls `host::spawn-process` to run
+`GalaxyClient.exe`. Concourse gates `spawn-process`/`run-and-wait` behind an explicit, visible
+per-plugin grant (Milestone 13) - installing via URL prompts for it in the confirm dialog; an
+already-installed copy (dropped in manually) shows a "Permission needed" row with a Grant
+button in Settings until granted once.
+
 ## Building
 
 ```sh
